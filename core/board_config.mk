@@ -199,7 +199,10 @@ _board_strip_readonly_list += $(_build_broken_var_list) \
 
 # Conditional to building on linux, as dex2oat currently does not work on darwin.
 ifeq ($(HOST_OS),linux)
-  WITH_DEXPREOPT := true
+  # OrbStack/Rosetta workaround: host dex2oat crashes under Rosetta,
+  # disable dexpreopt for local builds on this machine.
+  WITH_DEXPREOPT := false
+  WITH_DEX_PREOPT_GENERATE_PROFILE := false
 endif
 
 # ###############################################################
