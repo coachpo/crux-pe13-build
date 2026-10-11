@@ -23,7 +23,7 @@ import common
 import test_utils
 from sign_target_files_apks import (
     CheckApkAndApexKeysAvailable, EditTags, GetApkFileInfo, ReadApexKeysInfo,
-    ReplaceCerts, ReplaceGkiSigningKey, ReplaceVerityKeyId, RewriteAvbProps,
+    ReplaceCerts, ReplaceGkiSigningKey, ReplaceOtaKeys, ReplaceVerityKeyId, RewriteAvbProps,
     RewriteProps, WriteOtacerts)
 
 
@@ -297,6 +297,28 @@ name="apex.apexd_test_different_app.apex" public_key="system/apex/apexd/apexd_te
       otacerts_file = io.BytesIO(input_zip.read(entry_name))
       with zipfile.ZipFile(otacerts_file) as otacerts_zip:
         self.assertEqual(3, len(otacerts_zip.namelist()))
+
+  def test_ReplaceOtaKeys_nonempty_list(self):
+    source_cert = os.path.join(self.testdata_dir, 'testkey.x509.pem')
+    release_cert = os.path.join(self.testdata_dir, 'platform.x509.pem')
+    entries = ('SYSTEM/etc/security/otacerts.zip',
+               'RECOVERY/RAMDISK/system/etc/security/otacerts.zip')
+    input_file = common.MakeTempFile(suffix='.zip')
+    output_file = common.MakeTempFile(suffix='.zip')
+    with zipfile.ZipFile(input_file, 'w') as input_zip:
+      input_zip.writestr('META/otakeys.txt', source_cert + '\n')
+      for entry in entries:
+        input_zip.writestr(entry, b'original certificate archive')
+    common.OPTIONS.key_map = {source_cert[:-9]: release_cert[:-9]}
+    with zipfile.ZipFile(input_file) as input_zip, zipfile.ZipFile(output_file, 'w') as output_zip:
+      ReplaceOtaKeys(input_zip, output_zip, {})
+    with open(release_cert, 'rb') as cert_file:
+      expected_cert = cert_file.read()
+    with zipfile.ZipFile(output_file) as signed_zip:
+      for entry in entries:
+        with zipfile.ZipFile(io.BytesIO(signed_zip.read(entry))) as certs_zip:
+          self.assertEqual(len(certs_zip.namelist()), 1)
+          self.assertEqual(certs_zip.read(certs_zip.namelist()[0]), expected_cert)
 
   def test_CheckApkAndApexKeysAvailable(self):
     input_file = common.MakeTempFile(suffix='.zip')
